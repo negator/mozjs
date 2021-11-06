@@ -720,7 +720,7 @@ def split_triplet(triplet, allow_msvc=False):
         canonical_os = "OSX"
     elif os.startswith("ios"):
         canonical_kernel = "Darwin"
-        canonical_os = "iOS"
+        canonical_os = "OSX"
     elif os.startswith("dragonfly"):
         canonical_os = canonical_kernel = "DragonFly"
     elif os.startswith("freebsd"):
