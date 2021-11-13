@@ -181,19 +181,24 @@ with only_when(target_is_ios):
         help="Location of platform SDK to use",
     )
 
-    @depends("--with-iphone-sdk", host)
+    @depends("--with-iphone-sdk", host, target)
     @imports(_from="__builtin__", _import="open")
     @imports(_from="os.path", _import="isdir")
     @imports("plistlib")
-    def iphone_sdk(sdk, host):
+    def iphone_sdk(sdk, host, target):
         sdk_min_version = Version("10.12")
         sdk_max_version = Version("15.0")
         if sdk:
             sdk = sdk[0]
         elif host.os == "OSX":
-            sdk = check_cmd_output(
-                "xcrun", "--sdk", "iphoneos", "--show-sdk-path", onerror=lambda: ""
-            ).rstrip()
+            if target.cpu == "aarch64":
+                sdk = check_cmd_output(
+                    "xcrun", "--sdk", "iphoneos", "--show-sdk-path", onerror=lambda: ""
+                ).rstrip()
+            else:
+                sdk = check_cmd_output(
+                    "xcrun", "--sdk", "iphonesimulator", "--show-sdk-path", onerror=lambda: ""
+                ).rstrip()    
 
             if not sdk:
                 die(
@@ -2414,16 +2419,17 @@ set_config("LINKER_KIND", select_linker.KIND)
 @depends_if(select_linker, macos_sdk, iphone_sdk, sysroot_path, multiarch_dir)
 def linker_ldflags(linker, macos_sdk, iphone_sdk, sysroot_path, multiarch_dir):
     flags = list((linker and linker.LINKER_FLAG) or [])
-    if macos_sdk:
-        if linker and linker.KIND == "ld64":
-            flags.append("-Wl,-syslibroot,%s" % macos_sdk)
-        else:
-            flags.append("-Wl,--sysroot=%s" % macos_sdk)
+
     if iphone_sdk:
+        sdk = iphone_sdk;
+    elif macos_sdk:
+        sdk = macos_sdk;
+
+    if sdk:
         if linker and linker.KIND == "ld64":
-            flags.append("-Wl,-syslibroot,%s" % iphone_sdk)
+            flags.append("-Wl,-syslibroot,%s" % sdk)
         else:
-            flags.append("-Wl,--sysroot=%s" % iphone_sdk)
+            flags.append("-Wl,--sysroot=%s" % sdk)
 
     if sysroot_path and multiarch_dir:
         # Non-Debian-patched binutils linkers (both BFD and gold) don't lookup

@@ -1060,13 +1060,17 @@ def target_is_osx(target):
     if target.kernel == "Darwin" and target.os == "OSX":
         return True
 
+
+set_define("XP_MACOSX", target_is_osx)
+
+
 @depends(target)
 def target_is_ios(target):
     if target.kernel == "Darwin" and target.os == "iOS":
         return True
 
 
-set_define("XP_MACOSX", target_is_osx)
+set_define("IOS", target_is_ios)
 
 
 @depends(target)
