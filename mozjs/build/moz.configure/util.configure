@@ -212,6 +212,7 @@ def find_program(file, paths=None):
 @imports(_from="six", _import="ensure_binary")
 @imports(_from="tempfile", _import="mkstemp")
 def try_invoke_compiler(compiler, language, source, flags=None, onerror=None):
+
     flags = flags or []
 
     if not isinstance(flags, (list, tuple)):

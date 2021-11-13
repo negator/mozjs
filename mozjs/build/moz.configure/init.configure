@@ -720,7 +720,7 @@ def split_triplet(triplet, allow_msvc=False):
         canonical_os = "OSX"
     elif os.startswith("ios"):
         canonical_kernel = "Darwin"
-        canonical_os = "OSX"
+        canonical_os = "iOS"
     elif os.startswith("dragonfly"):
         canonical_os = canonical_kernel = "DragonFly"
     elif os.startswith("freebsd"):
@@ -791,7 +791,7 @@ def split_triplet(triplet, allow_msvc=False):
     # prefixes. We need to be more specific about the LLVM target on Mac
     # so cross-language LTO will work correctly.
 
-    if os.startswith("darwin"):
+    if os.startswith("darwin") or os.startswith("ios"):
         toolchain = "%s-apple-%s" % (cpu, os)
     elif canonical_cpu == "aarch64" and canonical_os == "WINNT":
         toolchain = "aarch64-windows-msvc"
@@ -1058,6 +1058,11 @@ set_define("XP_DARWIN", target_is_darwin)
 @depends(target)
 def target_is_osx(target):
     if target.kernel == "Darwin" and target.os == "OSX":
+        return True
+
+@depends(target)
+def target_is_ios(target):
+    if target.kernel == "Darwin" and target.os == "iOS":
         return True
 
 
