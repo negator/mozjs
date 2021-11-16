@@ -1,3 +1,5 @@
+cargo-features = ["strip"]
+
 [package]
 name = "mozjs_sys"
 description = "System crate for the Mozilla SpiderMonkey JavaScript engine."
@@ -14,6 +16,14 @@ exclude = [
   "mozjs/js/src/jsapi-tests/**",
   "mozjs/js/src/doc/**",
 ]
+
+[profile.release]
+strip = "symbols"
+opt-level = "s"
+debug = 0
+lto = "thin"
+incremental = true
+panic = 'abort'
 
 [features]
 debugmozjs = []
