@@ -7,7 +7,9 @@
 
 @depends(target)
 def jemalloc_default(target):
-    return target.kernel in ("Darwin", "Linux", "WINNT")
+    # Exclude mac/ios: https://github.com/jemalloc/jemalloc/issues/1633
+    # return target.kernel in ("Darwin", "Linux", "WINNT")    
+    return target.kernel in ("Linux", "WINNT")
 
 
 option(

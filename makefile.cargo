@@ -9,6 +9,7 @@ CONFIGURE_FLAGS := \
 	--disable-tests \
 	--disable-export-js \
 	--disable-shared-js \
+	--without-intl-api \
 	--build-backends=RecursiveMake
 
 ifneq (,$(MACOS_SDK_PATH))

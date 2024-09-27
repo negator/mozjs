@@ -93,7 +93,7 @@ with only_when(host_is_osx | target_is_osx):
         # installation docs:
         # https://firefox-source-docs.mozilla.org/setup/macos_build.html#macos-sdk-is-unsupported
         sdk_min_version = Version("10.12")
-        sdk_max_version = Version("11.1")
+        sdk_max_version = Version("12.0")
 
         if sdk:
             sdk = sdk[0]
@@ -170,6 +170,81 @@ with only_when(target_is_osx):
         return os.path.join(sdk or "/", "System/Library/PrivateFrameworks")
 
     set_config("MACOS_PRIVATE_FRAMEWORKS_DIR", macos_private_frameworks)
+
+with only_when(target_is_ios):
+    # iPhone SDK
+    # =========
+    option(
+        "--with-iphone-sdk",
+        env="IPHONE_SDK_DIR",
+        nargs=1,
+        help="Location of platform SDK to use",
+    )
+
+    @depends("--with-iphone-sdk", host, target)
+    @imports(_from="__builtin__", _import="open")
+    @imports(_from="os.path", _import="isdir")
+    @imports("plistlib")
+    def iphone_sdk(sdk, host, target):
+        sdk_min_version = Version("10.12")
+        sdk_max_version = Version("15.0")
+        if sdk:
+            sdk = sdk[0]
+        elif host.os == "OSX":
+            if target.cpu == "aarch64":
+                sdk = check_cmd_output(
+                    "xcrun", "--sdk", "iphoneos", "--show-sdk-path", onerror=lambda: ""
+                ).rstrip()
+            else:
+                sdk = check_cmd_output(
+                    "xcrun", "--sdk", "iphonesimulator", "--show-sdk-path", onerror=lambda: ""
+                ).rstrip()    
+
+            if not sdk:
+                die(
+                    "Could not find the iPhone SDK. Please use --with-iphone-sdk to give "
+                    "the path to a iPhone SDK."
+                )
+        else:
+            die(
+                "Need a iPhone SDK when targeting iPhone. Please use --with-iphone-sdk "
+                "to give the path to a iPhone SDK."
+            )
+
+        if not isdir(sdk):
+            die(
+                "SDK not found in %s. When using --with-iphone-sdk, you must specify a "
+                "valid SDK. SDKs are installed when the optional cross-development "
+                "tools are selected during the Xcode/Developer Tools installation."
+                % sdk
+            )
+        with open(os.path.join(sdk, "SDKSettings.plist"), "rb") as plist:
+            obj = plistlib.load(plist)
+        if not obj:
+            die("Error parsing SDKSettings.plist in the SDK directory: %s" % sdk)
+        if "Version" not in obj:
+            die(
+                "Error finding Version information in SDKSettings.plist from the SDK: %s"
+                % sdk
+            )
+        version = Version(obj["Version"])
+        sdk_installation_docs_url = "https://firefox-source-docs.mozilla.org/setup/macos_build.html#macos-sdk-is-unsupported"
+        if version < sdk_min_version:
+            die(
+                'SDK version "%s" is too old. Please upgrade to at least %s. Try '
+                "updating your system Xcode. If that's not sufficient, see the manual "
+                "SDK installation docs: %s"
+                % (version, sdk_min_version, sdk_installation_docs_url)
+            )
+        if version > sdk_max_version:
+            die(
+                'SDK version "%s" is unsupported. Please downgrade to version '
+                "%s. See the manual SDK installation docs: %s"
+                % (version, sdk_max_version, sdk_installation_docs_url)
+            )
+        return sdk
+
+    set_config("IPHONE_SDK_DIR", iphone_sdk)
 
 
 # GC rooting and hazard analysis.
@@ -954,11 +1029,13 @@ def sysroot_path(sysroot_input, path, bootstrap, automation):
 @template
 def sysroot_flags(host_or_target):
     @depends(
-        host_or_target, macos_sdk, sysroot_path if host_or_target is target else never
+        host_or_target, macos_sdk, iphone_sdk, sysroot_path if host_or_target is target else never
     )
-    def sysroot_flags(host_or_target, macos_sdk, sysroot_path):
+    def sysroot_flags(host_or_target, macos_sdk, iphone_sdk, sysroot_path):
         if macos_sdk and host_or_target.os == "OSX":
             return ["-isysroot", macos_sdk]
+        if iphone_sdk:
+            return ["-isysroot", iphone_sdk]
         if sysroot_path:
             return ["--sysroot", sysroot_path]
         return []
@@ -1983,7 +2060,7 @@ def coverage_cflags(target, c_compiler, build_env):
         exclude.append("^.*[vV][sS]20[0-9]{2}.*$")
         # Files in fetches directory.
         exclude.append("^.*[\\\\/]fetches[\\\\/].*$")
-    elif target.os == "OSX":
+    elif target.os == "OSX" or target.os == "iOS":
         # Files in fetches directory.
         exclude.append("^.*/fetches/.*$")
     elif target.os == "GNU":
@@ -2339,14 +2416,20 @@ def select_linker(
 set_config("LINKER_KIND", select_linker.KIND)
 
 
-@depends_if(select_linker, macos_sdk, sysroot_path, multiarch_dir)
-def linker_ldflags(linker, macos_sdk, sysroot_path, multiarch_dir):
+@depends_if(select_linker, macos_sdk, iphone_sdk, sysroot_path, multiarch_dir)
+def linker_ldflags(linker, macos_sdk, iphone_sdk, sysroot_path, multiarch_dir):
     flags = list((linker and linker.LINKER_FLAG) or [])
-    if macos_sdk:
+
+    if iphone_sdk:
+        sdk = iphone_sdk;
+    elif macos_sdk:
+        sdk = macos_sdk;
+
+    if sdk:
         if linker and linker.KIND == "ld64":
-            flags.append("-Wl,-syslibroot,%s" % macos_sdk)
+            flags.append("-Wl,-syslibroot,%s" % sdk)
         else:
-            flags.append("-Wl,--sysroot=%s" % macos_sdk)
+            flags.append("-Wl,--sysroot=%s" % sdk)
 
     if sysroot_path and multiarch_dir:
         # Non-Debian-patched binutils linkers (both BFD and gold) don't lookup

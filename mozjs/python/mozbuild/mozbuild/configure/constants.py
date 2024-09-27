@@ -23,6 +23,7 @@ OS = EnumString.subclass(
     "NetBSD",
     "OpenBSD",
     "OSX",
+    "iOS",
     "SunOS",
     "WINNT",
 )

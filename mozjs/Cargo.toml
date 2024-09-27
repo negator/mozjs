@@ -41,13 +41,14 @@ exclude = [
 [profile.dev]
 opt-level = 1
 rpath = false
-lto = false
+lto = true
 debug-assertions = true
 panic = "abort"
 
 [profile.release]
 opt-level = 2
 rpath = false
+lto = true
 debug-assertions = false
 panic = "abort"
 
